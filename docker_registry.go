@@ -9,9 +9,16 @@ import (
 	"os/signal"
 	"strconv"
 	"syscall"
+
+	"github.com/Sirupsen/logrus"
 )
 
-var logger = &Logger{}
+var logger = logrus.New()
+
+func init() {
+	logger.Formatter = new(logrus.TextFormatter)
+	logger.Level = logrus.Debug
+}
 
 var (
 	GITCOMMIT string
@@ -81,9 +88,9 @@ func main() {
 	pidFile := flag.String("p", "/var/run/docker-registry.pid", "File containing process PID")
 	flag.Parse()
 
-	logger.Level = INFO
+	logger.Level = logrus.Info
 	if *doDebug {
-		logger.Level = DEBUG
+		logger.Level = logrus.Debug
 	}
 	startServer(*listenOn, *dataDir, *pidFile)
 }

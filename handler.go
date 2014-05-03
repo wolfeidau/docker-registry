@@ -9,20 +9,14 @@ import (
 	"path/filepath"
 	"regexp"
 	"time"
+
+	"github.com/wolfeidau/docker-registry/uuid"
 )
 
 type Mapping struct {
 	Method  string
 	Regexp  *regexp.Regexp
 	Handler func(http.ResponseWriter, *http.Request, [][]string)
-}
-
-func GenerateUUID() string {
-	f, _ := os.Open("/dev/urandom")
-	b := make([]byte, 16)
-	f.Read(b)
-	f.Close()
-	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
 }
 
 type Handler struct {
@@ -39,7 +33,8 @@ func (h *Handler) WriteEndpointsHeader(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetPing(w http.ResponseWriter, r *http.Request, p [][]string) {
-	w.Header().Add("X-Docker-Registry-Version", "0.0.1")
+	logger.Infof("GetPing %s", p)
+	w.Header().Add("X-Docker-Registry-Version", "0.6.0")
 	w.WriteHeader(200)
 	fmt.Fprint(w, "pong")
 }
@@ -117,6 +112,7 @@ func (h *Handler) GetImageJson(w http.ResponseWriter, r *http.Request, p [][]str
 }
 
 func (h *Handler) GetRepositoryTags(w http.ResponseWriter, r *http.Request, p [][]string) {
+	logger.Infof("GetRepositoryTags %s", p)
 	repo := &Repository{h.DataDir + "/repositories/" + p[0][2]}
 	tagsJson, err := json.Marshal(repo.Tags())
 	if err != nil {
@@ -201,7 +197,7 @@ func (h *Handler) doHandle(w http.ResponseWriter, r *http.Request) (ok bool) {
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	started := time.Now()
-	uuid := GenerateUUID()
+	uuid := uuid.NewUUID()
 	w.Header().Add("X-Request-ID", uuid)
 	logger.Info(fmt.Sprintf("%s got request %s %s", uuid, r.Method, r.URL.String()))
 	if ok := h.doHandle(w, r); !ok {

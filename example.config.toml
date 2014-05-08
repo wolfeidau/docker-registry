@@ -1,0 +1,4 @@
+listen = ":5000"
+data = "/var/lib/docker-registry"
+pid-file = "/var/run/docker-registry.pid"
+debug = false

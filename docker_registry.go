@@ -11,6 +11,7 @@ import (
 	"syscall"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/wolfeidau/docker-registry/conf"
 )
 
 var logger = logrus.New()
@@ -20,11 +21,10 @@ func init() {
 	logger.Level = logrus.Debug
 }
 
-var (
-	GITCOMMIT string
-)
+var configFile = flag.String("config", "config.toml", "configuration file")
 
 func createPidFile(pidFile string) error {
+
 	if pidString, err := ioutil.ReadFile(pidFile); err == nil {
 		pid, err := strconv.Atoi(string(pidString))
 		if err == nil {
@@ -51,46 +51,43 @@ func removePidFile(pidFile string) {
 	}
 }
 
-func startServer(listenOn, dataDir string, pidFile string) {
-	logger.Info("using version ", GITCOMMIT)
-	logger.Info("starting server on ", listenOn)
-	logger.Info("using dataDir ", dataDir)
-	logger.Info("using pidFile", pidFile)
+func startServer(config *conf.Configuration) {
+	logger.Info("using version ", Version)
+	logger.Info("starting server on ", config.Listen)
+	logger.Info("using dataDir ", config.Data)
+	logger.Info("using pidFile", config.PidFile)
 
-	if err := createPidFile(pidFile); err != nil {
-		logger.Error(err)
-		os.Exit(1)
+	if config.PidFile != "" {
+
+		if err := createPidFile(config.PidFile); err != nil {
+			logger.Error(err)
+			os.Exit(1)
+		}
+
+		defer removePidFile(config.PidFile)
+
+		c := make(chan os.Signal, 1)
+		signal.Notify(c, os.Interrupt, os.Kill, os.Signal(syscall.SIGTERM))
+		go func() {
+			sig := <-c
+			logger.Debug("Received signal '%v', exiting\n", sig)
+			removePidFile(config.PidFile)
+			os.Exit(0)
+		}()
 	}
-	defer removePidFile(pidFile)
-
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt, os.Kill, os.Signal(syscall.SIGTERM))
-	go func() {
-		sig := <-c
-		logger.Debug("Received signal '%v', exiting\n", sig)
-		removePidFile(pidFile)
-		os.Exit(0)
-	}()
-
-	if err := http.ListenAndServe(listenOn, NewHandler(dataDir)); err != nil {
+	if err := http.ListenAndServe(config.Listen, NewHandler(config.Data)); err != nil {
 		logger.Error(err.Error())
 	}
 }
 
 func main() {
-	var listenOn *string
-	var dataDir *string
-	var doDebug *bool
-
-	listenOn = flag.String("l", ":80", "Address on which to listen.")
-	dataDir = flag.String("d", "/data/docker_index", "Directory to store data in")
-	doDebug = flag.Bool("D", false, "set log level to debug")
-	pidFile := flag.String("p", "/var/run/docker-registry.pid", "File containing process PID")
 	flag.Parse()
 
+	conf := conf.LoadConfiguration(*configFile)
+
 	logger.Level = logrus.Info
-	if *doDebug {
+	if conf.Debug {
 		logger.Level = logrus.Debug
 	}
-	startServer(*listenOn, *dataDir, *pidFile)
+	startServer(conf)
 }

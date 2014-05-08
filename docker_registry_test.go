@@ -2,13 +2,14 @@ package main
 
 import (
 	"bytes"
-	"github.com/remogatto/prettytest"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"regexp"
 	"testing"
+
+	"github.com/remogatto/prettytest"
 )
 
 type testSuite struct {

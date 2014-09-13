@@ -17,7 +17,7 @@ import (
 var logger = logrus.New()
 
 func init() {
-	logger.Formatter = new(logrus.TextFormatter)
+	logger.Formatter = new(logrus.JSONFormatter)
 	logger.Level = logrus.DebugLevel
 }
 
@@ -83,7 +83,12 @@ func startServer(config *conf.Configuration) {
 func main() {
 	flag.Parse()
 
-	conf := conf.LoadConfiguration(*configFile)
+	conf, err := conf.LoadConfiguration(*configFile)
+
+	if err != nil {
+		fmt.Printf("Unable to load configuration %s", err)
+		os.Exit(-1)
+	}
 
 	logger.Level = logrus.InfoLevel
 	if conf.Debug {

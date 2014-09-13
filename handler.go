@@ -40,7 +40,13 @@ func (h *Handler) GetPing(w http.ResponseWriter, r *http.Request, p [][]string) 
 }
 
 func (h *Handler) GetUsers(w http.ResponseWriter, r *http.Request, p [][]string) {
-	w.WriteHeader(201)
+	w.WriteHeader(200)
+	fmt.Fprint(w, "OK")
+}
+
+func (h *Handler) PostUsers(w http.ResponseWriter, r *http.Request, p [][]string) {
+	logger.Printf("p %v", p)
+	w.WriteHeader(200)
 	fmt.Fprint(w, "OK")
 }
 

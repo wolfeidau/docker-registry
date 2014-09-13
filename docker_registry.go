@@ -18,7 +18,7 @@ var logger = logrus.New()
 
 func init() {
 	logger.Formatter = new(logrus.TextFormatter)
-	logger.Level = logrus.Debug
+	logger.Level = logrus.DebugLevel
 }
 
 var configFile = flag.String("config", "config.toml", "configuration file")
@@ -85,9 +85,9 @@ func main() {
 
 	conf := conf.LoadConfiguration(*configFile)
 
-	logger.Level = logrus.Info
+	logger.Level = logrus.InfoLevel
 	if conf.Debug {
-		logger.Level = logrus.Debug
+		logger.Level = logrus.DebugLevel
 	}
 	startServer(conf)
 }

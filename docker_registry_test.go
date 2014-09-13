@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"testing"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/remogatto/prettytest"
 )
 
@@ -17,7 +18,7 @@ type testSuite struct {
 }
 
 func TestRunner(t *testing.T) {
-	logger.Level = WARN
+	logger.Level = logrus.InfoLevel
 	prettytest.RunWithFormatter(
 		t,
 		new(prettytest.TDDFormatter),
@@ -165,7 +166,7 @@ func (t *testSuite) TestReadFromServer() {
 	body, _ := ioutil.ReadAll(r.Body)
 	r.Body.Close()
 	t.Equal(string(body), "pong")
-	t.Equal(r.Header.Get("X-Docker-Registry-Version"), "0.0.1")
+	t.Equal(r.Header.Get("X-Docker-Registry-Version"), "0.6.0")
 
 	r, _ = http.Get(ser.URL + "/v1/images/e0acc43660ac918e0cd7f21f1020ee3078fec7b2c14006603bbc21499799e7d5/json")
 	t.Equal(r.StatusCode, 200)

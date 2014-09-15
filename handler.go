@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/wolfeidau/docker-registry/uuid"
 )
 
@@ -46,7 +47,7 @@ func (h *Handler) GetUsers(w http.ResponseWriter, r *http.Request, p [][]string)
 
 func (h *Handler) PostUsers(w http.ResponseWriter, r *http.Request, p [][]string) {
 	logger.Printf("p %v", p)
-	w.WriteHeader(200)
+	w.WriteHeader(201)
 	fmt.Fprint(w, "OK")
 }
 
@@ -206,6 +207,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	uuid := uuid.NewUUID()
 	w.Header().Add("X-Request-ID", uuid)
 	logger.Info(fmt.Sprintf("%s got request %s %s", uuid, r.Method, r.URL.String()))
+	logger.Info(spew.Sprintf("headers %v", r.Header))
 	if ok := h.doHandle(w, r); !ok {
 		logger.Info("returning 404")
 		http.NotFound(w, r)
@@ -219,6 +221,7 @@ func NewHandler(dataDir string) (handler *Handler) {
 	// dummies
 	handler.Map("GET", "_ping", handler.GetPing)
 	handler.Map("GET", "users", handler.GetUsers)
+	handler.Map("POST", "users/$", handler.PostUsers)
 
 	// images
 	handler.Map("GET", "images/(.*?)/ancestry", handler.GetImageAncestry)

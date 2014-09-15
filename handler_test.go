@@ -18,7 +18,7 @@ type testSuite struct {
 }
 
 func TestRunner(t *testing.T) {
-	logger.Level = logrus.InfoLevel
+	logger.Level = logrus.WarnLevel
 	prettytest.RunWithFormatter(
 		t,
 		new(prettytest.TDDFormatter),
@@ -157,8 +157,7 @@ func (t *testSuite) TestPutRepository() {
 func (t *testSuite) TestReadFromServer() {
 	dir, _ := os.Getwd()
 	dataDir := dir + "/fixtures/index"
-	h := NewHandler(dataDir)
-	ser := httptest.NewServer(h)
+	ser := httptest.NewServer(NewHandler(dataDir))
 	defer ser.Close()
 
 	r, _ := http.Get(ser.URL + "/v1/_ping")

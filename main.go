@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -20,8 +19,6 @@ func init() {
 	logger.Formatter = new(logrus.JSONFormatter)
 	logger.Level = logrus.DebugLevel
 }
-
-var configFile = flag.String("config", "config.toml", "configuration file")
 
 func createPidFile(pidFile string) error {
 
@@ -75,18 +72,18 @@ func startServer(config *conf.Configuration) {
 			os.Exit(0)
 		}()
 	}
+
 	if err := http.ListenAndServe(config.Listen, NewHandler(config.Data)); err != nil {
 		logger.Error(err.Error())
 	}
 }
 
 func main() {
-	flag.Parse()
 
-	conf, err := conf.LoadConfiguration(*configFile)
+	conf, err := conf.LoadConfiguration()
 
 	if err != nil {
-		fmt.Printf("Unable to load configuration %s", err)
+		fmt.Printf("Unable to load env %s", err)
 		os.Exit(-1)
 	}
 

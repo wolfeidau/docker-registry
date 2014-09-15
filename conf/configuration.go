@@ -9,7 +9,7 @@ type Configuration struct {
 	Debug   bool
 }
 
-func LoadConfiguration(fileName string) (*Configuration, error) {
+func LoadConfiguration() (*Configuration, error) {
 
 	var conf Configuration
 	err := envconfig.Process("myapp", &conf)

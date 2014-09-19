@@ -55,7 +55,7 @@ func startServer(config *conf.Configuration) {
 
 	auth := NewBasicAuth(users, config.Secret)
 
-	if err := http.ListenAndServe(config.Listen, NewHandler(config.Data, auth)); err != nil {
+	if err := http.ListenAndServe(config.Listen, NewHandler(config.Data, config.Namespace, auth)); err != nil {
 		logger.Error(err.Error())
 	}
 }

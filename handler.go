@@ -26,10 +26,10 @@ type Mapping struct {
 }
 
 type Handler struct {
-	DataDir   string
-	RediStore *redistore.RediStore
-	Auth      UserAuth
-	Mappings  []*Mapping
+	DataDir, Namespace string
+	RediStore          *redistore.RediStore
+	Auth               UserAuth
+	Mappings           []*Mapping
 }
 
 func (h *Handler) WriteJsonHeader(w http.ResponseWriter) {
@@ -136,6 +136,7 @@ func (h *Handler) GetRepositoryTags(w http.ResponseWriter, r *http.Request, p []
 	h.WriteEndpointsHeader(w, r)
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, string(tagsJson))
+	logger.Infof("tags %s", string(tagsJson))
 	return
 }
 
@@ -243,8 +244,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	logger.Info(fmt.Sprintf("%s finished request in %.06f", uuid, time.Now().Sub(started).Seconds()))
 }
 
-func NewHandler(dataDir string, auth UserAuth) (handler *Handler) {
-	handler = &Handler{DataDir: dataDir, Mappings: make([]*Mapping, 0), Auth: auth}
+func NewHandler(dataDir, namespace string, auth UserAuth) (handler *Handler) {
+	handler = &Handler{DataDir: dataDir, Namespace: namespace, Mappings: make([]*Mapping, 0), Auth: auth}
 
 	// dummies
 	handler.Map("GET", "_ping", handler.NoopAuthenticator, handler.GetPing)
@@ -259,10 +260,10 @@ func NewHandler(dataDir string, auth UserAuth) (handler *Handler) {
 	handler.Map("PUT", "images/(.*?)/(.*)", handler.RepoAuthenticator, handler.PutImageResource)
 
 	// repositories
-	handler.Map("GET", "repositories/(.*?)/tags", handler.RepoAuthenticator, handler.GetRepositoryTags)
-	handler.Map("GET", "repositories/(.*?)/images", handler.RepoAuthenticator, handler.GetRepositoryImages)
-	handler.Map("PUT", "repositories/(.*?)/tags/(.*)", handler.RepoAuthenticator, handler.PutRepositoryTags)
-	handler.Map("PUT", "repositories/(.*?)/images", handler.RepoAuthenticator, handler.PutRepositoryImages)
-	handler.Map("PUT", "repositories/(.*?)/$", handler.RepoAuthenticator, handler.PutRepository)
+	handler.Map("GET", fmt.Sprintf("repositories/%s/(.*?)/tags", namespace), handler.RepoAuthenticator, handler.GetRepositoryTags)
+	handler.Map("GET", fmt.Sprintf("repositories/%s/(.*?)/images", namespace), handler.RepoAuthenticator, handler.GetRepositoryImages)
+	handler.Map("PUT", fmt.Sprintf("repositories/%s/(.*?)/tags/(.*)", namespace), handler.RepoAuthenticator, handler.PutRepositoryTags)
+	handler.Map("PUT", fmt.Sprintf("repositories/%s/(.*?)/images", namespace), handler.RepoAuthenticator, handler.PutRepositoryImages)
+	handler.Map("PUT", fmt.Sprintf("repositories/%s/(.*?)/$", namespace), handler.RepoAuthenticator, handler.PutRepository)
 	return
 }

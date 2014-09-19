@@ -3,8 +3,8 @@ package conf
 import "github.com/kelseyhightower/envconfig"
 
 type Configuration struct {
-	Listen, Data, Redis, Secret, Pass string
-	Debug                             bool
+	Listen, Data, Namespace, Redis, Secret, Pass string
+	Debug                                        bool
 }
 
 func LoadConfiguration() (*Configuration, error) {
@@ -26,6 +26,10 @@ func LoadConfiguration() (*Configuration, error) {
 
 	if conf.Secret == "" {
 		conf.Secret = "TodlelOfBooHybUmtOifOul6"
+	}
+
+	if conf.Namespace == "" {
+		conf.Namespace = "library"
 	}
 
 	if conf.Data == "" {

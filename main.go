@@ -5,9 +5,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-	"os/signal"
 	"strconv"
-	"syscall"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/wolfeidau/docker-registry/conf"
@@ -52,28 +50,12 @@ func startServer(config *conf.Configuration) {
 	logger.Info("using version ", Version)
 	logger.Info("starting server on ", config.Listen)
 	logger.Info("using dataDir ", config.Data)
-	logger.Info("using pidFile", config.PidFile)
 
-	if config.PidFile != "" {
+	users := NewSingleUserStore(config.Pass)
 
-		if err := createPidFile(config.PidFile); err != nil {
-			logger.Error(err)
-			os.Exit(1)
-		}
+	auth := NewBasicAuth(users, config.Secret)
 
-		defer removePidFile(config.PidFile)
-
-		c := make(chan os.Signal, 1)
-		signal.Notify(c, os.Interrupt, os.Kill, os.Signal(syscall.SIGTERM))
-		go func() {
-			sig := <-c
-			logger.Debug("Received signal '%v', exiting\n", sig)
-			removePidFile(config.PidFile)
-			os.Exit(0)
-		}()
-	}
-
-	if err := http.ListenAndServe(config.Listen, NewHandler(config.Data)); err != nil {
+	if err := http.ListenAndServe(config.Listen, NewHandler(config.Data, auth)); err != nil {
 		logger.Error(err.Error())
 	}
 }

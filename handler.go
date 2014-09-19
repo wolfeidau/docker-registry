@@ -10,19 +10,26 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/boj/redistore"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/wolfeidau/docker-registry/uuid"
 )
 
+type HttpRouteHandler func(http.ResponseWriter, *http.Request, [][]string)
+type HttpAuthHandler func(http.ResponseWriter, *http.Request) bool
+
 type Mapping struct {
-	Method  string
-	Regexp  *regexp.Regexp
-	Handler func(http.ResponseWriter, *http.Request, [][]string)
+	Method        string
+	Regexp        *regexp.Regexp
+	Authenticator HttpAuthHandler
+	Handler       HttpRouteHandler
 }
 
 type Handler struct {
-	DataDir  string
-	Mappings []*Mapping
+	DataDir   string
+	RediStore *redistore.RediStore
+	Auth      UserAuth
+	Mappings  []*Mapping
 }
 
 func (h *Handler) WriteJsonHeader(w http.ResponseWriter) {
@@ -109,7 +116,6 @@ func (h *Handler) GetImageJson(w http.ResponseWriter, r *http.Request, p [][]str
 						w.Header().Add("X-Docker-Size", fmt.Sprintf("%d", stat.Size()))
 					}
 				}
-				w.WriteHeader(http.StatusOK)
 				io.Copy(w, file)
 				return
 			}
@@ -119,7 +125,6 @@ func (h *Handler) GetImageJson(w http.ResponseWriter, r *http.Request, p [][]str
 }
 
 func (h *Handler) GetRepositoryTags(w http.ResponseWriter, r *http.Request, p [][]string) {
-	logger.Infof("GetRepositoryTags %s", p)
 	repo := &Repository{h.DataDir + "/repositories/" + p[0][2]}
 	tagsJson, err := json.Marshal(repo.Tags())
 	if err != nil {
@@ -169,12 +174,12 @@ func (h *Handler) PutRepositoryImages(w http.ResponseWriter, r *http.Request, p 
 }
 
 func (h *Handler) PutRepository(w http.ResponseWriter, r *http.Request, p [][]string) {
+	repoName := p[0][2]
 	h.WriteJsonHeader(w)
 	h.WriteEndpointsHeader(w, r)
-	w.Header().Add("WWW-Authenticate", `Token signature=123abc,repository="dynport/test",access=write`)
-	w.Header().Add("X-Docker-Token", "token")
+	// w.Header().Add("WWW-Authenticate", `Token signature=123abc,repository="dynport/test",access=write`)
+	// w.Header().Add("X-Docker-Token", "token")
 	w.WriteHeader(http.StatusOK)
-	repoName := p[0][2]
 	repo := &Repository{h.DataDir + "/repositories/" + repoName}
 	err := writeFile(repo.IndexPath(), r.Body)
 	if err != nil {
@@ -182,11 +187,33 @@ func (h *Handler) PutRepository(w http.ResponseWriter, r *http.Request, p [][]st
 	}
 }
 
-func (h *Handler) Map(t, re string, f func(http.ResponseWriter, *http.Request, [][]string)) {
-	if h.Mappings == nil {
-		h.Mappings = make([]*Mapping, 0)
+func (h *Handler) RepoAuthenticator(w http.ResponseWriter, r *http.Request) bool {
+	// if the Authorization header is present
+	if _, ok := r.Header["Authorization"]; ok {
+		session, err := h.Auth.CheckAuth(r)
+		if err != nil {
+			w.Header().Add("WWW-Authenticate", `Basic realm="docker-registry"`)
+			w.WriteHeader(http.StatusUnauthorized)
+			return false
+		}
+
+		logger.Infof("session %s %s %d", session.Login, session.Token, session.Status)
+
+		switch session.Status {
+		case SessionNew:
+			w.Header().Add("WWW-Authenticate", `Token signature=123abc,repository="dynport/test",access=write`)
+			w.Header().Add("X-Docker-Token", session.Token)
+		}
 	}
-	h.Mappings = append(h.Mappings, &Mapping{t, regexp.MustCompile("/v(\\d+)/" + re), f})
+	return true
+}
+
+func (h *Handler) NoopAuthenticator(w http.ResponseWriter, r *http.Request) bool {
+	return true
+}
+
+func (h *Handler) Map(t, re string, authenticator HttpAuthHandler, handler HttpRouteHandler) {
+	h.Mappings = append(h.Mappings, &Mapping{t, regexp.MustCompile("/v(\\d+)/" + re), authenticator, handler})
 }
 
 func (h *Handler) doHandle(w http.ResponseWriter, r *http.Request) (ok bool) {
@@ -195,7 +222,9 @@ func (h *Handler) doHandle(w http.ResponseWriter, r *http.Request) (ok bool) {
 			continue
 		}
 		if res := mapping.Regexp.FindAllStringSubmatch(r.URL.String(), -1); len(res) > 0 {
-			mapping.Handler(w, r, res)
+			if ok := mapping.Authenticator(w, r); ok {
+				mapping.Handler(w, r, res)
+			}
 			return true
 		}
 	}
@@ -209,31 +238,31 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	logger.Info(fmt.Sprintf("%s got request %s %s", uuid, r.Method, r.URL.String()))
 	logger.Info(spew.Sprintf("headers %v", r.Header))
 	if ok := h.doHandle(w, r); !ok {
-		logger.Info("returning 404")
 		http.NotFound(w, r)
 	}
 	logger.Info(fmt.Sprintf("%s finished request in %.06f", uuid, time.Now().Sub(started).Seconds()))
 }
 
-func NewHandler(dataDir string) (handler *Handler) {
-	handler = &Handler{DataDir: dataDir}
+func NewHandler(dataDir string, auth UserAuth) (handler *Handler) {
+	handler = &Handler{DataDir: dataDir, Mappings: make([]*Mapping, 0), Auth: auth}
 
 	// dummies
-	handler.Map("GET", "_ping", handler.GetPing)
-	handler.Map("GET", "users", handler.GetUsers)
-	handler.Map("POST", "users/$", handler.PostUsers)
+	handler.Map("GET", "_ping", handler.NoopAuthenticator, handler.GetPing)
+	handler.Map("GET", "users", handler.RepoAuthenticator, handler.GetUsers)
+	handler.Map("POST", "users/$", handler.NoopAuthenticator, handler.PostUsers)
 
 	// images
-	handler.Map("GET", "images/(.*?)/ancestry", handler.GetImageAncestry)
-	handler.Map("GET", "images/(.*?)/layer", handler.GetImageLayer)
-	handler.Map("GET", "images/(.*?)/json", handler.GetImageJson)
-	handler.Map("PUT", "images/(.*?)/(.*)", handler.PutImageResource)
+	handler.Map("GET", "images/(.*?)/ancestry", handler.RepoAuthenticator, handler.GetImageAncestry)
+
+	handler.Map("GET", "images/(.*?)/layer", handler.RepoAuthenticator, handler.GetImageLayer)
+	handler.Map("GET", "images/(.*?)/json", handler.RepoAuthenticator, handler.GetImageJson)
+	handler.Map("PUT", "images/(.*?)/(.*)", handler.RepoAuthenticator, handler.PutImageResource)
 
 	// repositories
-	handler.Map("GET", "repositories/(.*?)/tags", handler.GetRepositoryTags)
-	handler.Map("GET", "repositories/(.*?)/images", handler.GetRepositoryImages)
-	handler.Map("PUT", "repositories/(.*?)/tags/(.*)", handler.PutRepositoryTags)
-	handler.Map("PUT", "repositories/(.*?)/images", handler.PutRepositoryImages)
-	handler.Map("PUT", "repositories/(.*?)/$", handler.PutRepository)
+	handler.Map("GET", "repositories/(.*?)/tags", handler.RepoAuthenticator, handler.GetRepositoryTags)
+	handler.Map("GET", "repositories/(.*?)/images", handler.RepoAuthenticator, handler.GetRepositoryImages)
+	handler.Map("PUT", "repositories/(.*?)/tags/(.*)", handler.RepoAuthenticator, handler.PutRepositoryTags)
+	handler.Map("PUT", "repositories/(.*?)/images", handler.RepoAuthenticator, handler.PutRepositoryImages)
+	handler.Map("PUT", "repositories/(.*?)/$", handler.RepoAuthenticator, handler.PutRepository)
 	return
 }

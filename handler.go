@@ -10,7 +10,6 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/boj/redistore"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/wolfeidau/docker-registry/uuid"
 )
@@ -27,7 +26,6 @@ type Mapping struct {
 
 type Handler struct {
 	DataDir, Namespace string
-	RediStore          *redistore.RediStore
 	Auth               UserAuth
 	Mappings           []*Mapping
 }

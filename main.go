@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -61,6 +62,15 @@ func startServer(config *conf.Configuration) {
 }
 
 func main() {
+
+	version := flag.Bool("version", false, "prints current docker-registry version")
+
+	flag.Parse()
+
+	if *version {
+		fmt.Println(Version)
+		os.Exit(0)
+	}
 
 	conf, err := conf.LoadConfiguration()
 

@@ -33,7 +33,7 @@ func LoadConfiguration() (*Configuration, error) {
 	}
 
 	if conf.Data == "" {
-		conf.Data = "/Users/markw/docker/docker_index"
+		conf.Data = "/var/lib/docker-registry/docker_index"
 	}
 
 	if conf.Pass == "" {

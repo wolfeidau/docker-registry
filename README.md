@@ -1,37 +1,19 @@
-# Docker Registry (golang implementation)
+# Docker Registry
 
-## Requirements
+This is a modified version of the golang implementation of the docker registry which was cloned from the docker contributions folder.
 
-You need to have docker >= 0.5.0 up and running.
+# Requirements
 
-## Build and start docker image for registry
+The service relies on a bunch of environment variables to operate.
 
-    $ git clone https://github.com/dotcloud/docker-registry.git docker-registry.git
-    $ cd docker-registry.git/contrib/golang_impl
-    $ docker build -t docker_registry/golang .
-    $ docker run -v /data:/data -d -p 80:80 docker_registry/golang
+```
+    export REGISTRY_DATA=/data/docker       # where all the files are stored
+    export REGISTRY_NAMESPACE=wolfeidau     # used in the docker URL similiar to your dockerhub user
+    export REGISTRY_PASS="SETTHISNOW"       # global password used to log in to the registry
+    export REGISTRY_SECRET="SETTHISNOW"     # secret for generating sessions
+```    
 
-__Notice__: -p 80:80 binds the registry to your local port 80. This is necessary because it seems you currently cannot delete images where
-the tag includes a port.
+# TODO
 
-## Test / Use
-
-### Push test image to registry
-    
-    $ docker build -t 127.0.0.1/test/test - << EOF
-    FROM ubuntu
-    RUN echo world > /hello
-    CMD cat /hello
-    EOF
-
-    $ docker push 127.0.0.1/test/test
-
-### Delete local registry image
-
-    $ docker rmi 127.0.0.1/test/test
-
-### Run test image
-
-    $ docker run 127.0.0.1/test/test
-
-Now the image is fetched from your local registry and executed. Should print out `world`.
+* Implement logins using something other than a single password
+* Move to using JWT for sessions.

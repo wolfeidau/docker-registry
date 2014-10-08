@@ -10,7 +10,6 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/wolfeidau/docker-registry/uuid"
 )
 
@@ -40,8 +39,10 @@ func (h *Handler) WriteEndpointsHeader(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) GetPing(w http.ResponseWriter, r *http.Request, p [][]string) {
 	logger.Infof("GetPing %s", p)
+
 	w.Header().Add("X-Docker-Registry-Version", "0.6.0")
 	w.WriteHeader(200)
+
 	fmt.Fprint(w, "pong")
 }
 
@@ -57,7 +58,9 @@ func (h *Handler) PostUsers(w http.ResponseWriter, r *http.Request, p [][]string
 }
 
 func (h *Handler) GetRepositoryImages(w http.ResponseWriter, r *http.Request, p [][]string) {
+
 	repo := &Repository{h.DataDir + "/repositories/" + p[0][2]}
+
 	if images, err := repo.Images(); err == nil {
 		h.WriteJsonHeader(w)
 		h.WriteEndpointsHeader(w, r)
@@ -66,14 +69,17 @@ func (h *Handler) GetRepositoryImages(w http.ResponseWriter, r *http.Request, p 
 	} else {
 		logger.Error(err.Error())
 		w.WriteHeader(http.StatusNotFound)
-		return
 	}
-	return
+
 }
 
 func (h *Handler) GetImageAncestry(w http.ResponseWriter, r *http.Request, p [][]string) {
 	idPrefix := p[0][2]
-	if paths, err := filepath.Glob(h.DataDir + "/images/" + idPrefix + "*"); err == nil {
+
+	globPath := h.DataDir + "/images/" + idPrefix + "*"
+	logger.Printf("GetImageAncestry %s", globPath)
+
+	if paths, err := filepath.Glob(globPath); err == nil {
 		if len(paths) > 0 {
 			image := &Image{paths[0]}
 			if out, err := json.Marshal(image.Ancestry()); err == nil {
@@ -84,12 +90,17 @@ func (h *Handler) GetImageAncestry(w http.ResponseWriter, r *http.Request, p [][
 			}
 		}
 	}
+
 	http.NotFound(w, r)
 }
 
 func (h *Handler) GetImageLayer(w http.ResponseWriter, r *http.Request, p [][]string) {
 	idPrefix := p[0][2]
-	if paths, err := filepath.Glob(h.DataDir + "/images/" + idPrefix + "*"); err == nil {
+
+	globPath := h.DataDir + "/images/" + idPrefix + "*"
+	logger.Printf("GetImageLayer %s", globPath)
+
+	if paths, err := filepath.Glob(globPath); err == nil {
 		image := &Image{paths[0]}
 		file, err := os.Open(image.LayerPath())
 		if err == nil {
@@ -104,7 +115,11 @@ func (h *Handler) GetImageLayer(w http.ResponseWriter, r *http.Request, p [][]st
 
 func (h *Handler) GetImageJson(w http.ResponseWriter, r *http.Request, p [][]string) {
 	idPrefix := p[0][2]
-	if paths, err := filepath.Glob(h.DataDir + "/images/" + idPrefix + "*"); err == nil {
+
+	globPath := h.DataDir + "/images/" + idPrefix + "*"
+	logger.Printf("GetImageJson %s", globPath)
+
+	if paths, err := filepath.Glob(globPath); err == nil {
 		if len(paths) > 0 {
 			image := &Image{paths[0]}
 			file, err := os.Open(image.Dir + "/json")
@@ -119,23 +134,28 @@ func (h *Handler) GetImageJson(w http.ResponseWriter, r *http.Request, p [][]str
 			}
 		}
 	}
+
 	w.WriteHeader(http.StatusNotFound)
 }
 
 func (h *Handler) GetRepositoryTags(w http.ResponseWriter, r *http.Request, p [][]string) {
+
 	repo := &Repository{h.DataDir + "/repositories/" + p[0][2]}
 	tagsJson, err := json.Marshal(repo.Tags())
+
 	if err != nil {
 		w.WriteHeader(http.StatusNotFound)
 		fmt.Fprintf(w, err.Error())
 		return
 	}
+
 	h.WriteJsonHeader(w)
 	h.WriteEndpointsHeader(w, r)
 	w.WriteHeader(http.StatusOK)
+
 	fmt.Fprintf(w, string(tagsJson))
+
 	logger.Infof("tags %s", string(tagsJson))
-	return
 }
 
 func (h *Handler) PutImageResource(w http.ResponseWriter, r *http.Request, p [][]string) {
@@ -143,6 +163,7 @@ func (h *Handler) PutImageResource(w http.ResponseWriter, r *http.Request, p [][
 	tagName := p[0][3]
 
 	err := writeFile(h.DataDir+"/images/"+imageId+"/"+tagName, r.Body)
+
 	if err != nil {
 		logger.Error(err.Error())
 	} else {
@@ -151,8 +172,10 @@ func (h *Handler) PutImageResource(w http.ResponseWriter, r *http.Request, p [][
 }
 
 func (h *Handler) PutRepositoryTags(w http.ResponseWriter, r *http.Request, p [][]string) {
+
 	repoName := p[0][2]
 	path := h.DataDir + "/repositories/" + repoName + "/tags/" + p[0][3]
+
 	err := writeFile(path, r.Body)
 	if err != nil {
 		logger.Error(err.Error())
@@ -162,8 +185,10 @@ func (h *Handler) PutRepositoryTags(w http.ResponseWriter, r *http.Request, p []
 }
 
 func (h *Handler) PutRepositoryImages(w http.ResponseWriter, r *http.Request, p [][]string) {
+
 	repoName := p[0][2]
 	repo := &Repository{h.DataDir + "/repositories/" + repoName}
+
 	err := writeFile(repo.ImagesPath(), r.Body)
 	if err != nil {
 		logger.Error(err.Error())
@@ -173,20 +198,24 @@ func (h *Handler) PutRepositoryImages(w http.ResponseWriter, r *http.Request, p 
 }
 
 func (h *Handler) PutRepository(w http.ResponseWriter, r *http.Request, p [][]string) {
+
 	repoName := p[0][2]
+
 	h.WriteJsonHeader(w)
 	h.WriteEndpointsHeader(w, r)
-	// w.Header().Add("WWW-Authenticate", `Token signature=123abc,repository="dynport/test",access=write`)
-	// w.Header().Add("X-Docker-Token", "token")
 	w.WriteHeader(http.StatusOK)
+
 	repo := &Repository{h.DataDir + "/repositories/" + repoName}
+
 	err := writeFile(repo.IndexPath(), r.Body)
+
 	if err != nil {
 		logger.Error(err.Error())
 	}
 }
 
 func (h *Handler) RepoAuthenticator(w http.ResponseWriter, r *http.Request) bool {
+
 	// if the Authorization header is present
 	if _, ok := r.Header["Authorization"]; ok {
 		session, err := h.Auth.CheckAuth(r)
@@ -216,6 +245,7 @@ func (h *Handler) Map(t, re string, authenticator HttpAuthHandler, handler HttpR
 }
 
 func (h *Handler) doHandle(w http.ResponseWriter, r *http.Request) (ok bool) {
+
 	for _, mapping := range h.Mappings {
 		if r.Method != mapping.Method {
 			continue
@@ -227,19 +257,25 @@ func (h *Handler) doHandle(w http.ResponseWriter, r *http.Request) (ok bool) {
 			return true
 		}
 	}
+
 	return false
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+
 	started := time.Now()
 	uuid := uuid.NewUUID()
+
 	w.Header().Add("X-Request-ID", uuid)
-	logger.Info(fmt.Sprintf("%s got request %s %s", uuid, r.Method, r.URL.String()))
-	logger.Info(spew.Sprintf("headers %v", r.Header))
+
+	// logger.Info(fmt.Sprintf("%s got request %s %s", uuid, r.Method, r.URL.String()))
+	// logger.Info(spew.Sprintf("headers %v", r.Header))
+
 	if ok := h.doHandle(w, r); !ok {
 		http.NotFound(w, r)
 	}
-	logger.Info(fmt.Sprintf("%s finished request in %.06f", uuid, time.Now().Sub(started).Seconds()))
+	l
+	ogger.Info(fmt.Sprintf("%s finished request in %.06f", uuid, time.Now().Sub(started).Seconds()))
 }
 
 func NewHandler(dataDir, namespace string, auth UserAuth) (handler *Handler) {

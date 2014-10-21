@@ -274,8 +274,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if ok := h.doHandle(w, r); !ok {
 		http.NotFound(w, r)
 	}
-	l
-	ogger.Info(fmt.Sprintf("%s finished request in %.06f", uuid, time.Now().Sub(started).Seconds()))
+	logger.Info(fmt.Sprintf("%s finished request in %.06f", uuid, time.Now().Sub(started).Seconds()))
 }
 
 func NewHandler(dataDir, namespace string, auth UserAuth) (handler *Handler) {
